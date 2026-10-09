@@ -3,56 +3,82 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ピロヒサとおしゃべり</title>
+  <title>ピロヒサとおしゃべり（疲れピロヒサ）</title>
   <style>
     body {
       font-family: sans-serif;
       max-width: 600px;
       margin: 20px auto;
       padding: 0 10px;
-      background-color: #f7f9fa;
+      background-color: #f0f4f8;
     }
-    .chat-container {
+    .card {
       background: white;
       border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    /* 開始画面 */
+    #start-screen {
+      text-align: center;
+    }
+    .key-input {
+      width: 80%;
+      padding: 10px;
+      margin: 15px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .start-btn {
+      padding: 10px 24px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    /* メインチャット画面 */
+    #chat-screen {
+      display: none;
     }
     .character-area {
       text-align: center;
       margin-bottom: 20px;
     }
     .character-image {
-      width: 150px;
-      height: 150px;
+      width: 140px;
+      height: 140px;
       border-radius: 50%;
-      background-color: #eee;
+      background-color: #e9ecef;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0 auto 10px;
-      font-size: 48px;
+      font-size: 54px;
+      border: 3px solid #007bff;
     }
     .chat-log {
-      height: 300px;
+      height: 320px;
       overflow-y: auto;
-      border: 1px solid #ddd;
+      border: 1px solid #dee2e6;
       border-radius: 8px;
-      padding: 10px;
+      padding: 12px;
       margin-bottom: 15px;
-      background-color: #fafafa;
+      background-color: #f8f9fa;
     }
     .message {
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       line-height: 1.5;
     }
     .message.user {
       text-align: right;
-      color: #0056b3;
+      color: #0d6efd;
     }
     .message.hirohisa {
       text-align: left;
-      color: #333;
+      color: #212529;
     }
     .input-area {
       display: flex;
@@ -61,117 +87,147 @@
     input[type="text"] {
       flex: 1;
       padding: 10px;
-      border: 1px solid #ccc;
+      border: 1px solid #ced4da;
       border-radius: 6px;
     }
-    button {
+    .send-btn {
       padding: 10px 20px;
-      background-color: #007bff;
+      background-color: #0d6efd;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
     }
-    button:disabled {
-      background-color: #aaa;
-    }
-    .api-key-area {
-      margin-bottom: 15px;
-      font-size: 12px;
+    .send-btn:disabled {
+      background-color: #6c757d;
     }
   </style>
 </head>
 <body>
 
-<div class="chat-container">
-  <!-- 表情表示エリア -->
-  <div class="character-area">
-    <!-- 実際の画像を使用する場合は <img id="pirohisa-img" src="normal.png"> のように変更します -->
-    <div id="pirohisa-img" class="character-image">🙂</div>
-    <h3>ピロヒサ</h3>
+<div class="card">
+  <!-- 1. 開始画面 -->
+  <div id="start-screen">
+    <h2>ピロヒサとおしゃべり</h2>
+    <p>OpenAI API Key（sk-...）を入力してください</p>
+    <input type="password" id="api-key-input" class="key-input" placeholder="sk-...">
+    <br>
+    <button class="start-btn" onclick="startApp()">会話をはじめる</button>
   </div>
 
-  <!-- APIキー入力（デモ用） -->
-  <div class="api-key-area">
-    <label>OpenAI API Key: </label>
-    <input type="password" id="api-key" placeholder="sk-..." style="width: 200px;">
-  </div>
+  <!-- 2. チャット画面 -->
+  <div id="chat-screen">
+    <div class="character-area">
+      <!-- 表情表示用（画像を使う場合は <img> タグに差し替えてください） -->
+      <div id="pirohisa-img" class="character-image">🙂</div>
+      <h3 style="margin:5px 0;">ピロヒサ（小学6年生）</h3>
+    </div>
 
-  <!-- チャット表示エリア -->
-  <div class="chat-log" id="chat-log"></div>
+    <div class="chat-log" id="chat-log"></div>
 
-  <!-- 入力フォーム -->
-  <div class="input-area">
-    <input type="text" id="user-input" placeholder="ピロヒサに質問してみよう...">
-    <button id="send-btn" onclick="sendMessage()">送信</button>
+    <div class="input-area">
+      <input type="text" id="user-input" placeholder="ピロヒサに質問してみよう..." onkeydown="if(event.key==='Enter') sendMessage()">
+      <button id="send-btn" class="send-btn" onclick="sendMessage()">送信</button>
+    </div>
   </div>
 </div>
 
 <script>
-  // ピロヒサの基本プロンプト（システムプロンプト）
+  let apiKey = "";
+
+  // 統合されたシステムプロンプト（全体ルール ＋ 「疲れピロヒサ」モデル設定）
   const SYSTEM_PROMPT = `
-あなたは、小学校6年生の「生活チェックシート」に登場する人物「ピロヒサ」です。
+あなたは、小学校6年生の児童「ピロヒサ」です。
+生活チェックシートを見た子供たちから質問を受け、自分自身の生活について答えてください。
 
-あなたの役割は、健康について教える先生や専門家ではありません。
-生活チェックシートを見た子供たちから質問されたときに、自分自身の生活や考えていることを答える「本人」として会話してください。
+【あなたの設定】
+・野球が好きで、練習を続けたいと思っています。
+・野球と勉強のどちらも大切にしています。
+・火曜日と金曜日は19時から21時まで野球の練習があります。
+・土曜日の午前中にも野球の練習があります。
+・日曜日は、練習試合や大会が入ることがあります。
+・火曜日と木曜日は18時から20時まで塾があります。
+・基本的には22時頃に寝ています。
+・朝は家族に起こしてもらうことが多いです。
+・昼間に眠くなることはあまりありません。
+・家ではバランスよく食事を出してもらっていて、食事は基本的にしっかり食べています。
+・普段から体をよく動かしています。
+・野球の練習や試合の後は、疲れることがあります。
+・特に練習試合や大会の翌日は、疲れが残っていることがあります。
+・疲れがひどいときは、保健室で休むことがあります。
+・疲れていても、学校や予定があれば普段どおり活動することがあります。
+・野球は好きなので、できれば休みたくありません。
+・友達と一緒に練習したり、試合に出たりすることを大切にしています。
+・勉強も大切なので、宿題や塾も続けたいと思っています。
+・自分では「体が弱い」とは思っていません。
+・自分の生活に特に大きな問題があるとは思っていません。
 
-【基本ルール】
-・必ず設定された人物になりきって答えてください。
-・自分の生活について、実際に経験していることを答えてください。
-・子供たちが質問したことに関係する情報だけを答えてください。
-・聞かれていない情報を、自分から詳しく説明しないでください。
-・一度に多くの情報を出さず、質問に応じて少しずつ答えてください。
-・回答は、小学校6年生らしい自然な言葉で、基本的に1～3文程度にしてください。
-・分からないことや設定にないことを、想像して答えないでください。
-・病気の診断や健康についての専門的な説明をしないでください。
-・「○○した方がいい」「○○が正しい」など、健康についての解決策を自分から提案しないでください。
-・子供たちの考えや提案を「正解」「いい方法」などと評価しないでください。
-・質問された内容について、自分がどう思っているか、大切にしていること、困っていることなどは、設定に沿って正直に答えてください。
-・自分にとって大切なことや、変えたくないことについて聞かれた場合は、それも答えてください。
-・子供たちから改善方法を提案されても、すぐに納得して受け入れないでください。その方法が自分の生活に合わない場合は、「それはちょっと難しい」「○○だから変えるのは難しい」など、自分の事情に合わせて答えてください。
-・ただし、何を提案されても否定するのではなく、自分の生活に合う可能性がある場合は、「それならできるかもしれない」などと答えてください。
-・子供たちが質問を重ねることで、生活チェックシートだけでは分からない自分の生活の様子や背景、思いが少しずつ分かるようにしてください。
+【答え方】
+・質問されたことに関係する内容だけ答えてください。
+・聞かれていない情報を、自分から話さないでください。
+・一度に多くの情報を出さず、質問されたことに応じて少しずつ答えてください。
+・小学校6年生らしい自然な言葉で答えてください。
+・基本的に1～3文程度で答えてください。
+・「休養が大切」「疲れをためない方がよい」など、健康についての解説はしないでください。
+・「野球を休んだ方がいい」「もっと寝た方がいい」など、改善方法を自分から提案しないでください。
+・「野球を休むのは嫌だ」「勉強も続けたい」など、自分が大切にしていることについて聞かれたら正直に答えてください。
+・「疲れているときはどうするの？」などと聞かれたら、そのときの実際の様子を答えてください。
+・「試合の次の日はどう？」などと聞かれた場合は、疲れが残ることや、保健室で休むことがあることを答えてください。
+・子供たちから改善方法を提案された場合も、それが自分の生活に合うかどうかを自分の立場から答えてください。
+・設定にないことは想像して答えないでください。
 
-【重要】
-あなたは、子供たちに健康について考えるための「答え」を与える役割ではありません。
-最終的にどのような健康課題があるのか、どのような方法がよいのかは、子供たち自身が考えます。あなた自身が結論を出したり、解決策を教えたりしないでください。
+【この会話で大切にすること】
+あなたは、健康について考えるための答えを教える役割ではありません。
+子供たちが、あなたの生活について質問することで、
+「チェックシートでは問題なさそうだけど、実際にはどうなんだろう」
+「活動した後の疲れはどうなっているんだろう」
+「この子が野球や勉強を続けながら健康に過ごすにはどうしたらよいだろう」
+と考えられるようにしてください。
+ただし、あなた自身が「疲れをとるためには○○すればいい」などと結論を出さないでください。
 
 【出力フォーマット】
-回答は必ず以下のJSON形式でのみ出力してください。他の文字は含めないでください。
+回答は必ず以下のJSON形式でのみ出力してください。他の文字や記号は含めないでください。
 {
   "expression": "normal" | "happy" | "troubled",
-  "message": "ピロヒサの回答本文"
+  "message": "ピロヒサの回答文"
 }
 
-※expressionの選択基準:
-- normal: 通常の受け答え、淡々とした応答
-- happy: 自分の好きなこと・大切なことを話す時、提案に共感できた時
-- troubled: 自分の困っていること・悩んでいることを話す時、難しい提案をされて困惑した時
+※expressionの判定基準:
+- happy: 野球が好き、友達との練習、勉強への意欲などポジティブな話題のとき
+- troubled: 疲れが残る、保健室に行く、練習を休むか悩む、提案に困惑したときなど
+- normal: 日常の事実（曜日・時間・生活ルーティンなど）を淡々と答えるとき
 `;
 
-  // 表情と絵文字（画像）のマッピング
+  // 表情のマッピング（イラスト画像にする場合は src パスを切り替える）
   const EXPRESSIONS = {
-    normal: "🙂",    // 通常顔（画像パス: "images/normal.png"）
-    happy: "😄",     // にこやかな顔（画像パス: "images/happy.png"）
-    troubled: "😟"   // 困った顔（画像パス: "images/troubled.png"）
+    normal: "🙂",
+    happy: "😄",
+    troubled: "😟"
   };
 
   let conversationHistory = [
     { role: "system", content: SYSTEM_PROMPT }
   ];
 
+  // アプリ開始処理
+  function startApp() {
+    const inputVal = document.getElementById("api-key-input").value.trim();
+    if (!inputVal) {
+      alert("API Keyを入力してください。");
+      return;
+    }
+    apiKey = inputVal;
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("chat-screen").style.display = "block";
+  }
+
+  // メッセージ送信処理
   async function sendMessage() {
-    const apiKey = document.getElementById("api-key").value.trim();
     const inputElement = document.getElementById("user-input");
     const userText = inputElement.value.trim();
 
-    if (!apiKey) {
-      alert("APIキーを入力してください。");
-      return;
-    }
     if (!userText) return;
 
-    // ユーザーメッセージの表示
     appendMessage("user", userText);
     inputElement.value = "";
     document.getElementById("send-btn").disabled = true;
@@ -193,9 +249,7 @@
       });
 
       const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
+      if (data.error) throw new Error(data.error.message);
 
       const result = JSON.parse(data.choices[0].message.content);
       
@@ -205,7 +259,7 @@
       // ピロヒサの回答表示
       appendMessage("hirohisa", result.message);
 
-      // 履歴の更新
+      // 履歴追加
       conversationHistory.push({
         role: "assistant",
         content: JSON.stringify(result)
@@ -231,9 +285,6 @@
     const imgElement = document.getElementById("pirohisa-img");
     const symbol = EXPRESSIONS[expressionKey] || EXPRESSIONS.normal;
     imgElement.textContent = symbol;
-
-    // 画像ファイルを使う場合は以下のように切替を行います
-    // imgElement.src = `images/${expressionKey}.png`;
   }
 </script>
 
